@@ -1,14 +1,18 @@
-from smbus import  SMBus
 from time import sleep
 from subprocess import call
 from random import randint
-import RPi.GPIO as GPIO
+
+fake = False
+try:
+  from smbus import  SMBus
+  import RPi.GPIO as GPIO
+except:
+  fake = True
 
 testmode = 0
 # do env now
 testmode = 9
 
-GPIO.setmode(GPIO.BCM)
 
 I2C_PCF8591 = 0x48
 RPI_GPIO_I2C_BUS = 1
@@ -21,18 +25,26 @@ LED_LOW = 23
 
 GP_SWITCH = 24
 
-GPIO.setup(LED_LOW, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
-GPIO.setup(LED_HIGH, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
-GPIO.setup(LED_VERYHIGH, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
-GPIO.setup(LED_EXTREME, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
-GPIO.setup(LED_MEDIUM, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
+def setup_hardware():
+  if fake:
+    print "Fake mode: skipping GPIO init"
+    return
+  GPIO.setmode(GPIO.BCM)
 
-GPIO.setup(GP_SWITCH, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+  GPIO.setup(LED_LOW, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
+  GPIO.setup(LED_HIGH, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
+  GPIO.setup(LED_VERYHIGH, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
+  GPIO.setup(LED_EXTREME, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
+  GPIO.setup(LED_MEDIUM, GPIO.OUT, pull_up_down = GPIO.PUD_DOWN)
+
+  GPIO.setup(GP_SWITCH, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
 
 # Read a value from analogue input 0
 # in A/D in the PCF8591P @ address 0x48
 # On the PiA, the pin2,3 i2c is on bus(1)
 def read_adc0_mv():
+  if fake: return randint(0, 2450)
+
   bus = SMBus(RPI_GPIO_I2C_BUS)
   sleep(1) # settle
   bus.write_byte(I2C_PCF8591, 0x40) # set control register to read channel 0
@@ -56,6 +68,8 @@ def mv_to_uvrating(mv):
   
 
 def all_leds():
+  print "set all LEDs"
+  if fake: return
   GPIO.output(LED_LOW, GPIO.HIGH);
   GPIO.output(LED_MEDIUM, GPIO.HIGH);
   GPIO.output(LED_HIGH, GPIO.HIGH);
@@ -63,6 +77,8 @@ def all_leds():
   GPIO.output(LED_EXTREME, GPIO.HIGH);
 
 def clear_leds():
+  print "clear all LEDs"
+  if fake: return
   GPIO.output(LED_LOW, GPIO.LOW);
   GPIO.output(LED_MEDIUM, GPIO.LOW);
   GPIO.output(LED_HIGH, GPIO.LOW);
@@ -70,6 +86,8 @@ def clear_leds():
   GPIO.output(LED_EXTREME, GPIO.LOW);
 
 def cycle_through_leds():
+  print "cycle through LEDs"
+  if fake: return
   clear_leds()
   GPIO.output(LED_LOW, GPIO.HIGH);
   sleep(0.75)
@@ -94,6 +112,8 @@ def cycle_through_leds():
   clear_leds()
 
 def boot_leds():
+  print "boot LEDs"
+  if fake: return
   all_leds()
   sleep(1.5)
   clear_leds()
@@ -106,6 +126,8 @@ def boot_leds():
   sleep(1)
 
 def button_leds():
+  print "button pressed LEDs"
+  if fake: return
   clear_leds()
   sleep(0.1)
   all_leds()
@@ -141,6 +163,8 @@ def button_leds():
   GPIO.output(LED_LOW, GPIO.LOW);
 
 def rating_leds(rating):
+  print "rating LEDs ", rating
+  if fake: return
   clear_leds()
   GPIO.output(LED_LOW, GPIO.HIGH);
   if (rating > 2):
@@ -170,8 +194,22 @@ def speak_random_fact():
   else:
     speak("fact2", "Fact2.wav")
 
+def speak_rating_only(rating):
+  if (rating == 0): speak("zero")
+  elif (rating == 1): speak("one", "1.wav")
+  elif (rating == 2): speak("two", "2.wav")
+  elif (rating == 3): speak("three", "3.wav")
+  elif (rating == 4): speak("four", "4.wav")
+  elif (rating == 5): speak("five", "5.wav")
+  elif (rating == 6): speak("six", "6.wav")
+  elif (rating == 7): speak("seven", "7.wav")
+  elif (rating == 8): speak("eight", "8.wav")
+  elif (rating == 9): speak("nine", "9.wav")
+  elif (rating == 10): speak("ten", "10.wav")
+  else: speak("eleven or above", "11.wav")
+
 def speak_rating(rating):
-  speak("The current UV rating is", "TheMeasureIs.wav")
+  speak("FIXME: Measure1: The current UV rating is", "TheMeasureIs.wav")  # Measure1.wav
 
   if (rating == 0): speak("zero")
   elif (rating == 1): speak("one", "1.wav")
@@ -186,34 +224,60 @@ def speak_rating(rating):
   elif (rating == 10): speak("ten", "10.wav")
   else: speak("eleven or above", "11.wav")
 
-  speak("This rating is ")
+  # speak("This rating is ")
 
   if (rating < 3):
-    speak("Low")
+    speak("Low", "ratinglow.wav")
   elif (rating < 6):
-    speak("Medium")
+    speak("Medium", "ratingmedium.wav")
   elif (rating < 9):
-    speak("High. We recommend you aeweaing sunscreen")
+    speak("High. We recommend you aeweaing sunscreen", "ratinghigh.wav")
   elif (rating < 11 ):
-    speak("Very High. You should be wearing sunscreen and staying hydrated")
+    speak("Very High. You should be wearing sunscreen and staying hydrated", "ratingveryhigh.wav")
   else:
-    speak("Extreme. If you are not wearing sunsceen you are now `being sunburned!")
+    speak("Extreme. If you are not wearing sunsceen you are now `being sunburned!", "ratingextreme.wav")
+
+  # FIXME speak("Hydrate", "Hydrated.wav")
+
 
 def speak_website(millivolts, rating):
   if millivolts < 10:
+    # Darkweb
     speak("Please visit h t t p : // commun-uv.weebly.com and learn about the CommonUV project")
     speak("You may like to try again in daylight, and help us by reporting the UV rating")
     speak("This will help us track localised UV radiation, which may differ from ")
     speak("The published Adelaide rating due to cloud cover, for example")  
   else:
-    speak("Please visit h t t p : // commun-uv.weebly.com and enter the rating number")
+    #speak("Please visit h t t p : // commun-uv.weebly.com and enter the rating number")
+    # FIXME Crowsdource.wav
+    #speak("This will help us track localised UV radiation, which may differ from ")
+    #speak("The published Adelaide rating due to cloud cover, for example")
     speak("Please", "PleaseLogYourReading.wav")
-    speak_rating(rating) 
-    speak("And this location, which is Tonsley")
+    speak_rating_only(rating) 
+    #speak("And this location, which is Tonsley")
     speak("web", "IntoOurWebsite.wav")
-    speak("This will help us track localised UV radiation, which may differ from ")
-    speak("The published Adelaide rating due to cloud cover, for example")
-  speak("More information is at h t t p : // commun-uv.weebly.com")
+  speak("More information is at h t t p : // commun-uv.weebly.com") # Info.wav
+
+def speak_random_cancer_stats()
+  speak("FIXME: While we are waiting, did you know that in")  # Cancer1.wav
+  x = randint(0,4) + 2010
+  if x = 2010: speak("2011", "2010.wav")  # then CancerA.wav
+  elif x = 2011: speak("2011", "2011.wav")  # then CancerB.wav
+  elif x = 2012: speak("2012", "2012.wav")  # etc
+  elif x = 2013: speak("2013", "2013.wav")
+  elif x = 2014: speak("2014", "2014.wav")
+
+  # Cancer2.wav
+
+  # https://data.sa.gov.au/data/dataset/sa-cancer-registry/resource/e2925b74-6811-439f-9063-77bc00253ca9
+
+
+  # Nearest treatment
+
+  # https://data.sa.gov.au/data/dataset/6da4db36-e461-483c-9c3b-d21c48423d7e/resource/31f1d816-339d-44af-87c7-83b10e481f03/download/gpplus.zip
+
+  # Wav: gplus 1 2 3
+
 
 boot_leds()
 
@@ -225,16 +289,24 @@ print "ADC0 voltage is ", millivolts / 1000.0
 print "Equivalent UV rating is ", mv_to_uvrating(millivolts)
 
 while True:
-  GPIO.wait_for_edge(GP_SWITCH, GPIO.RISING)
-  GPIO.wait_for_edge(GP_SWITCH, GPIO.FALLING)
+
+  # TODO: how to background flash?
+
+  if fake:
+    sleep(5)
+  else:
+    GPIO.wait_for_edge(GP_SWITCH, GPIO.RISING)
+    GPIO.wait_for_edge(GP_SWITCH, GPIO.FALLING)
   print "Someone pressed the button"
 
   all_leds()
   speak("Welcome to commun U V", "Welcome.wav")
-  speak("Commun U V helps maintain comunity awaress about U V exposure and skin cancer")
+  speak("FIXME: Welcome2: Commun U V helps maintain comunity awaress about U V exposure and skin cancer")  # Welcome2
   button_leds()
 
-  speak("I will now check the current U V radiation level")
+  speak("FIXME: Welcome3: I will now check the current U V radiation level")  # Welcome3
+
+  speak_random_cancer_stats()
 
   millivolts = read_adc0_mv()
   rating = mv_to_uvrating(millivolts)
@@ -242,9 +314,9 @@ while True:
     millivolts = 324
     rating = testmode
   if millivolts < 10:
-    speak("It seems to be dark, or you are inside", "TooDarkTheMeasureWas.wav")
-    speak("This time last year, the average UV rating was")
-    speak("(last years UV rating)")
+    speak("FIXME: TooDark1: It seems to be dark, or you are inside", "TooDarkTheMeasureWas.wav")
+    speak("FIXME: TooDark2: This time last year, the average UV rating was")  # speak URL to arpansa
+    # speak("(last years UV rating)")
   else:
     speak_rating(rating)
 
@@ -254,9 +326,15 @@ while True:
 
   speak_website(millivolts, rating)
 
-  speak_thankyou()
+  speak_thankyou() # and Info.wav
 
 # Extra stuff
 # On 1 nov 2014
 # Arpansa data det
 # Cancer data set
+
+# ToDO on website:
+
+# data.sa links
+# ABS link for population  1976 http://abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/2104.01976?OpenDocument
+
